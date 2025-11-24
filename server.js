@@ -250,14 +250,123 @@ let users = [];
 app.get("/", (_req, res) => {
   res.send("Server is running");
 });
-
+/** =========================================================
+ * TODO 1: IMPLEMENT USER REGISTRATION (POST /register)
+ * =========================================================
+ * WHAT ROUTE TO USE:
+ *   - Use POST because we are CREATING a new user resource.
+ *   - The route is already defined for you:
+ *
+ *       app.post("/register", async (req, res) => { ... })
+ *
+ * WHAT IT MUST DO:
+ *   1) Read JSON body:
+ *        const { email, password } = req.body || {};
+ *   2) Validate required fields:
+ *        - If email OR password is missing:
+ *            return res.status(400).json({ error: "Email and password are required" });
+ *   3) Check if user already exists in the in-memory "users" array:
+ *        const existing = users.find((u) => u.email === email);
+ *        - If existing is found:
+ *            return res.status(400).json({ error: "User already exists" });
+ *   4) Hash the password using bcrypt:
+ *        const hash = await bcrypt.hash(password, 10);
+ *   5) Store the new user:
+ *        users.push({ email, passwordHash: hash });
+ *   6) Send success response:
+ *        return res.status(201).json({ message: "User registered!" });
+ *   7) Wrap everything in try/catch; on error:
+ *        console.error("Register error:", err);
+ *        return res.status(500).json({ error: "Server error during register" });
+ *
+ * HOW TO TEST /register:
+ *   - METHOD: POST
+ *   - URL:    http://localhost:3000/register
+ *   - BODY (raw + JSON):
+ *       {
+ *         "email": "student@example.com",
+ *         "password": "mypassword123"
+ *       }
+ *   - EXPECT:
+ *       • First time: 201, { "message": "User registered!" }
+ *       • Second time with same email: 400, { "error": "User already exists" }
+ */
 // =========================
 // POST /register
 // =========================
 app.post("/register", async (req, res) => {
   // Implement logic here based on the TODO 1.
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res
+      .status(400)
+      .json({ error: "Email and password are required" });
+  }
+  const existing = users.find((u) => u.email === email);
+  if (existing) {
+    return res.status(400).json({ error: "User already exists" });
+  }
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    users.push({ email, passwordHash: hash });
+    return res.status(201).json({ message: "User registered!" });
+  } catch (err) {
+    console.error("Register error:", err);
+    return res.status(500).json({ error: "Server error during register" });
+  }
 });
 
+/*
+=========================================================
+ * TODO 2: IMPLEMENT USER LOGIN (POST /login)
+ * =========================================================
+ * WHAT ROUTE TO USE:
+ *   - Use POST because we are SENDING credentials to authenticate.
+ *   - The route is:
+ *
+ *       app.post("/login", async (req, res) => { ... })
+ *
+ * WHAT IT MUST DO:
+ *   1) Read JSON body:
+ *        const { email, password } = req.body || {};
+ *   2) Validate:
+ *        - If missing email OR password:
+ *            return res.status(400).json({ error: "Email and password are required" });
+ *   3) Find user by email:
+ *        const user = users.find((u) => u.email === email);
+ *        - If NOT found:
+ *            return res.status(400).json({ error: "User not found" });
+ *   4) Compare passwords with bcrypt:
+ *        const match = await bcrypt.compare(password, user.passwordHash);
+ *        - If NOT matched:
+ *            return res.status(400).json({ error: "Wrong password" });
+ *   5) Create JWT token using secret "abc123":
+ *        const token = jwt.sign(
+ *          { email },
+ *          JWT_SECRET,          // this is "abc123"
+ *          { expiresIn: "1h" }
+ *        );
+ *   6) Return the token:
+ *        return res.json({ token });
+ *   7) On unexpected error, catch and respond:
+ *        console.error("Login error:", err);
+ *        return res.status(500).json({ error: "Server error during login" });
+ *
+ * HOW TO TEST /login:
+ *   - Make sure you have already registered the user.
+ *   - METHOD: POST
+ *   - URL:    http://localhost:3000/login
+ *   - BODY (raw + JSON):
+ *       {
+ *         "email": "student@example.com",
+ *         "password": "mypassword123"
+ *       }
+ *   - EXPECT:
+ *       • On success: 200, { "token": "<JWT_STRING>" }
+ *       • Wrong email:   400, { "error": "User not found" }
+ *       • Wrong password:400, { "error": "Wrong password" }
+ *
+ */
 // =========================
 // POST /login
 // =========================
