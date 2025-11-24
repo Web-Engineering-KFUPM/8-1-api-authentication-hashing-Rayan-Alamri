@@ -372,14 +372,161 @@ app.post("/register", async (req, res) => {
 // =========================
 app.post("/login", async (req, res) => {
   // Implement logic here based on the TODO 2.
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res
+      .status(400)
+      .json({ error: "Email and password are required" });
+  }
+  const user = users.find((u) => u.email === email);
+  if (!user) {
+    return res.status(400).json({ error: "User not found" });
+  }
+  try {
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) {
+      return res.status(400).json({ error: "Wrong password" });
+    }
+    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "1h" });
+    return res.json({ token });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ error: "Server error during login" });
+  }
 });
 
+/*
+ * =========================================================
+ * TODO 3: IMPLEMENT PROTECTED WEATHER ENDPOINT (GET /weather)
+ * =========================================================
+ * WHAT ROUTE TO USE:
+ *   - Use GET because we are RETRIEVING weather information.
+ *   - The route is:
+ *
+ *       app.get("/weather", async (req, res) => { ... })
+ *
+ * AUTHENTICATION REQUIREMENT (EXTREMELY IMPORTANT):
+ *   This route is PROTECTED by JWT.
+ *
+ *   The client MUST send a valid token in the `Authorization` header.
+ *
+ *   ▶ HOW TO ADD AUTHORIZATION IN POSTMAN / THUNDER CLIENT:
+ *
+ *   1) First, obtain a token by calling the /login endpoint.
+ *      Example response:
+ *        {
+ *          "token": "eyJhbGciOiJIUzI1..."
+ *        }
+ *
+ *   2) Copy the token (the entire long string).
+ *
+ *   3) Open POSTMAN → go to the **Headers** tab.
+ *
+ *   4) Add a new header:
+ *
+ *         KEY:     Authorization
+ *         VALUE:   Bearer <paste_your_token_here>
+ *
+ *      ✔ Example (VALUE field):
+ *         Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....
+ *
+ *      ⚠ DO NOT put quotes around the token.
+ *      ⚠ DO NOT remove the word "Bearer".
+ *      ⚠ There MUST be ONE SPACE between "Bearer" and the token.
+ *
+ *   5) Now call the endpoint:
+ *
+ *         METHOD: GET
+ *         URL:    http://localhost:3000/weather?city=Riyadh
+ *
+ *   6) If your token is valid → you get weather JSON.
+ *      If invalid → you get:
+ *         401 { "error": "Invalid token" }
+ *
+ *
+ * WHAT THIS ROUTE MUST DO:
+ *   1) Read Authorization header:
+ *        const auth = req.headers.authorization;
+ *        - If missing:
+ *            return res.status(401).json({ error: "Missing token" });
+ *
+ *   2) Extract token:
+ *        const token = auth.split(" ")[1];
+ *
+ *   3) Verify token:
+ *        try {
+ *          jwt.verify(token, JWT_SECRET);
+ *        } catch {
+ *          return res.status(401).json({ error: "Invalid token" });
+ *        }
+ *
+ *   4) Read city from query string:
+ *        const city = req.query.city;
+ *        - If missing:
+ *            return res.status(400).json({ error: "City required" });
+ *
+ *   5) Prepare external weather API URL:
+ *        const url = `https://goweather.herokuapp.com/weather/${encodeURIComponent(city)}`;
+ *
+ *   6) Use fetch() to call API:
+ *        const weatherResponse = await fetch(url);
+ *        if (!weatherResponse.ok) {
+ *          return res.status(500).json({ error: "Error from weather API" });
+ *        }
+ *
+ *   7) Parse JSON:
+ *        const data = await weatherResponse.json();
+ *
+ *   8) Return structured weather data:
+ *        return res.json({
+ *          city,
+ *          temp: data.temperature,
+ *          description: data.description,
+ *          wind: data.wind,
+ *          raw: data   // full API response if students want to inspect
+ *        });
+ *
+ *   9) If something crashes inside try block:
+ *        return res.status(500).json({ error: "Server error during weather fetch" });
+ */
 // =========================
 // Protected Weather API
 // GET /weather?city=Riyadh
 // =========================
 app.get("/weather", async (req, res) => {
   // Implement logic here based on the TODO 3.
+  const auth = req.headers.authorization;
+  if (!auth) {
+    return res.status(401).json({ error: "Missing token" });
+  }
+  const token = auth.split(" ")[1];
+  try {
+    jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+  const city = req.query.city;
+  if (!city) {
+    return res.status(400).json({ error: "City required" });
+  }
+  const url = `https://goweather.herokuapp.com/weather/${encodeURIComponent(city)}`;
+  try {
+    const weatherResponse = await fetch(url);
+    if (!weatherResponse.ok) {
+      return res.status(500).json({ error: "Error from weather API" });
+    }
+    const data = await weatherResponse.json();
+    return res.json({
+      city,
+      temp: data.temperature,
+      description: data.description,
+      wind: data.wind,
+      raw: data,
+    });
+  } catch (err) {
+    console.error("Weather fetch error:", err);
+    return res.status(500).json({ error: "Server error during weather fetch" });
+  }
 });
 
 // Start server
